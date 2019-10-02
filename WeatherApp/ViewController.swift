@@ -62,21 +62,26 @@ class ViewController: UIViewController {
         
         let resource = Resource<WeatherResult>(url: url)
         
+//        let search = URLRequest.load(resource: resource)
+//            .observeOn(MainScheduler.instance) //pour être async
+//            .asDriver(onErrorJustReturn: WeatherResult.empty)
+        
         let search = URLRequest.load(resource: resource)
-            .observeOn(MainScheduler.instance) //pour être async
-            .catchErrorJustReturn(WeatherResult.empty) //ce qui est retourné tant que le nom de la ville n'est pas fini de taper
-//            .subscribe(onNext: { result in
-//                let weather = result.main
-//                self.displayWeather(weather)
-//            }).disposed(by: disposeBag)
+        .observeOn(MainScheduler.instance)
+            .retry(3) //réessaie si on a une erreur
+            .catchError { error in //ville non trouvée donc pas de bonne url
+                print(error.localizedDescription)
+                return Observable.just(WeatherResult.empty)
+            }.asDriver(onErrorJustReturn: WeatherResult.empty)
+        
         
         //permet de directement relier la valeur retournée à notre UI
         search.map{ "\($0.main.temp) ℃" }
-            .bind(to:self.temperatureLabel.rx.text)
+            .drive(self.temperatureLabel.rx.text)
             .disposed(by: disposeBag)
         
         search.map{ "\($0.main.humidity) 💧" }
-            .bind(to:self.humidityLabel.rx.text)
+            .drive(self.humidityLabel.rx.text)
             .disposed(by: disposeBag)
     }
     
